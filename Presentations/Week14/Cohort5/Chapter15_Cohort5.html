@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Chapter 15: S4</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="R4DS Reading Group" />
+    <script src="libs/header-attrs-2.8/header-attrs.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Chapter 15: S4
+## Brett Longworth
+### R4DS Reading Group
+
+---
+
+
+
+
+
+
+
+# S4 provides a formal approach to functional OOP. 
+
+&lt;img src="img/formal.jpg" width="50%" height="50%" style="display: block; margin: auto;" /&gt;
+
+---
+
+## Important features
+
+
+"Functional" OOP: Methods dispatched by generics + argument signature
+
+The __slot__, a named component of the object that is accessed using the specialized subsetting operator `@`. 
+
+__methods Package__ provides functions for:
+- Creating, instantiating, validating classes (`setClass()` and friends)
+- Creating generics (`setGeneric()`)
+- Assigning methods for dispatch (`setMethod()`)
+
+This package is always available when you're running R interactively.
+
+Use `library(methods)` in scripts, and to tell readers that you're using S4.
+  
+---
+class: inverse center middle
+
+# Overview of S4 classes, generics and methods
+
+---
+
+## Create a new S4 class 
+
+
+```r
+Person &lt;- setClass("Person", 
+  slots = c(
+    name = "character", 
+    age = "numeric"
+  )
+)
+```
+
+
+### Create an instance
+
+
+```r
+pooh &lt;- new("Person", name = "Pooh Bear", age = NA_real_)
+```
+
+-or-
+
+
+```r
+pooh &lt;- Person(name = "Pooh Bear", age = NA_real_)
+```
+
+---
+
+## Basic class access
+
+.pull-left[
+#### Print/show
+
+
+```r
+pooh
+```
+
+```
+## An object of class "Person"
+## Slot "name":
+## [1] "Pooh Bear"
+## 
+## Slot "age":
+## [1] NA
+```
+
+#### What are you?
+
+
+```r
+is(pooh)
+```
+
+```
+## [1] "Person"
+```
+
+```r
+is(pooh, "Person")
+```
+
+```
+## [1] TRUE
+```
+]
+
+.pull-right[
+#### Data access
+
+```r
+pooh@name
+```
+
+```
+## [1] "Pooh Bear"
+```
+
+```r
+slot(pooh, "age")
+```
+
+```
+## [1] NA
+```
+]
+
+---
+
+### Creating setter/getter Generics
+
+Friends don't make friends use slot syntax for accessing objects.
+
+Two steps:
+
+Creating setter/getter function generics with `setGeneric()`:
+
+
+```r
+setGeneric("age", function(x) standardGeneric("age"))
+setGeneric("age&lt;-", function(x, value) standardGeneric("age&lt;-"))
+```
+
+And then defining class methods for the generics with `setMethod()`:
+
+
+```r
+setMethod("age", "Person", function(x) x@age)
+setMethod("age&lt;-", "Person", function(x, value) {
+  x@age &lt;- value
+  x
+})
+
+age(pooh) &lt;- 95
+age(pooh)
+```
+
+```
+## [1] 95
+```
+
+---
+class: inverse center middle
+
+# Classes
+
+---
+## Defining classes
+
+Call setClass() with three arguments:
+
+- The class __name__. By convention, S4 class names use UpperCamelCase.
+- A named character vector that describes the names and classes of the __slots__ (fields). 
+- A __prototype__, a list of default values for each slot. Technically, the prototype is optional, but you should always provide it.
+
+.pull-left[
+
+```r
+Person &lt;- setClass("Person", 
+  slots = c(
+    name = "character", 
+    age = "numeric"
+  ), 
+  prototype = list(
+    name = NA_character_,
+    age = NA_real_
+  )
+)
+
+me &lt;- Person(name = "Brett")
+str(me)
+```
+]
+
+.pull-right[
+
+```
+## Formal class 'Person' [package ".GlobalEnv"] with 2 slots
+##   ..@ name: chr "Brett"
+##   ..@ age : num NA
+```
+
+Note that `setClass()`
+
+- Creates the class
+- Silently returns a function for constructing new class objects
+
+]
+
+---
+
+## Inheritance
+
+The `contains` argument to `setClass()` specifies a class (or classes) to inherit data and methods from. 
+
+
+```r
+setClass("Employee", 
+  contains = "Person", 
+  slots = c(
+    boss = "Person"
+  ),
+  prototype = list(
+    boss = new("Person")
+  )
+)
+
+str(new("Employee"))
+```
+
+```
+## Formal class 'Employee' [package ".GlobalEnv"] with 3 slots
+##   ..@ boss:Formal class 'Person' [package ".GlobalEnv"] with 2 slots
+##   .. .. ..@ name: chr NA
+##   .. .. ..@ age : num NA
+##   ..@ name: chr NA
+##   ..@ age : num NA
+```
+
+---
+
+## Inheritance introspection
+
+To determine what classes an object inherits from, use `is()`:
+
+
+```r
+is(new("Person"))
+is(new("Employee"))
+```
+
+```
+[1] "Person"
+[1] "Employee" "Person"  
+```
+
+To test if an object inherits from a specific class, use the second argument of `is()`:
+
+
+```r
+is(pooh, "Person")
+```
+
+```
+[1] TRUE
+```
+
+---
+
+## Helper
+
+`new()` is a low-level constructor. 
+
+User-facing classes should always be paired with a user-friendly helper. 
+
+A helper should always:
+
+- Have the same name as the class, e.g. `Person()`.
+- Finish by calling `methods::new()`.
+
+
+
+```r
+Person &lt;- function(name, age = NA) {
+  age &lt;- as.double(age)
+  
+  new("Person", name = name, age = age)
+}
+
+Person("Pooh")
+```
+
+```
+## An object of class "Person"
+## Slot "name":
+## [1] "Pooh"
+## 
+## Slot "age":
+## [1] NA
+```
+
+---
+
+## Validator
+
+The constructor automatically checks that the slots have correct classes. However, we might want to test that all slots have the same length as we want to store info about multiple people
+
+
+```r
+Person("Pooh", age = c(4, 95))
+```
+
+```
+## An object of class "Person"
+## Slot "name":
+## [1] "Pooh"
+## 
+## Slot "age":
+## [1]  4 95
+```
+
+---
+
+## Validator
+
+To enforce these additional constraints we write a validator with `setValidity()`. It takes a class and a function that returns `TRUE` if the input is valid, and otherwise returns a character vector describing the problem(s):
+
+
+```r
+setValidity("Person", function(object) {
+  if (length(object@name) != length(object@age)) {
+    "@name and @age must be same length"
+  } else {
+    TRUE
+  }
+})
+```
+
+```
+## Class "Person" [in ".GlobalEnv"]
+## 
+## Slots:
+##                           
+## Name:       name       age
+## Class: character   numeric
+```
+
+
+
+```r
+Person("Pooh", age = c(4, 95))
+```
+```
+Error in validObject(.Object) : invalid class “Person” object: @name and @age must be same length
+```
+
+---
+class: inverse center middle
+
+# Generics and Methods
+
+---
+
+## Generics
+
+The job of a generic is to perform method dispatch, i.e. find the specific implementation for the combination of classes passed to the generic.
+
+To create a new S4 generic, call `setGeneric()` with a function that calls `standardGeneric()`:
+
+
+```r
+setGeneric("myGeneric", function(x) standardGeneric("myGeneric"))
+```
+
+```
+## [1] "myGeneric"
+```
+
+
+__`signature`__ allows you to control the arguments that are used for method dispatch. If `signature` is not supplied, all arguments (apart from `...`) are used
+
+Here, we're using it to tell S4 that only the class of `x` needs to be considered for dispatch:
+
+
+```r
+setGeneric("myGeneric", 
+  function(x, ..., verbose = TRUE) standardGeneric("myGeneric"),
+  signature = "x"
+)
+```
+
+```
+## [1] "myGeneric"
+```
+
+---
+
+## Methods
+
+Define methods for generics with `setMethod()`. 
+
+There are three important arguments: 
+- name of the generic (__`f`__)
+- name of the class (the __`signature`__)
+- the method itself (the __`definition`__)
+
+
+```r
+setMethod("myGeneric", "Person", function(x) {
+  # method implementation
+})
+```
+
+In S4, unlike S3, the signature can include multiple arguments. This makes method dispatch in S4 substantially more complicated.
+
+---
+
+## Method introspection
+
+- To list all the methods that belong to a generic, or that are associated with a class, use `methods("generic")` or `methods(class = "class")`
+
+
+```r
+methods("myGeneric")
+```
+
+```
+## no methods found
+```
+
+
+
+```r
+methods(class = "Person")
+```
+
+```
+## [1] age   age&lt;-
+## see '?methods' for accessing help and source code
+```
+
+
+---
+
+## Method introspection
+
+To find the implementation of a specific method, use `selectMethod("generic", "class")`. You can get the arguments by looking at the `args()` of the generic
+
+
+```r
+selectMethod("myGeneric", "Person")
+```
+
+```
+Method Definition:
+
+function (x, ..., verbose = TRUE) 
+{
+    .local &lt;- function (x) 
+    {
+    }
+    .local(x, ...)
+}
+
+Signatures:
+        x       
+target  "Person"
+defined "Person"
+```
+
+
+```r
+args(getGeneric("myGeneric"))
+```
+
+```
+function (x, ..., verbose = TRUE) 
+NULL
+```
+
+---
+
+## Common generics: `show`
+
+`show()` = S4 `print()`
+
+The show method for the Person class needs to have a single argument `object`:
+
+
+```r
+setMethod("show", "Person", function(object) {
+  cat(is(object)[[1]], "\n",
+      "  Name: ", object@name, "\n",
+      "  Age:  ", object@age, "\n",
+      sep = ""
+  )
+})
+
+pooh
+```
+
+```
+## Person
+##   Name: Pooh
+##   Age:  95
+```
+
+---
+class: inverse center middle
+
+# Method dispatch
+
+---
+
+.pull-left[
+__S4 dispatch__ is complicated because S4 has two important features:
+
+* Multiple inheritance, i.e. a class can have multiple parents, 
+* Multiple dispatch, i.e. a generic can use multiple arguments to pick a method. 
+
+These features make S4 very powerful, but can also make it hard to understand which method will get selected for a given combination of inputs. In practice, keep method dispatch as simple as possible by avoiding multiple inheritance, and reserving multiple dispatch only for where it is absolutely necessary.
+
+ Hadley uses a cool concept to illustrate this - an imaginary __class graph__ based on emoji:
+]
+
+.pull-right[
+&lt;img src="img/emoji.png" width="60%" height="60%" style="display: block; margin: auto;" /&gt;
+]
+
+---
+
+## Single dispatch
+
+Let's start with the simplest case: a generic function that dispatches on a single class with a single parent. The method dispatch here is simple so it's a good place to define the graphical conventions we'll use for the more complex cases.
+
+&lt;img src="img/single.png" width="30%" height="30%" style="display: block; margin: auto;" /&gt;
+
+There are two parts to this diagram:
+
+* The top part, `f(...)`, defines the scope of the diagram. Here we have a 
+  generic with one argument, that has a class hierarchy that is three levels 
+  deep.
+  
+* The bottom part is the __method graph__ and  displays all the possible methods 
+  that could be defined. Methods that exist, i.e. that have been defined with 
+  `setMethod()`, have a grey background. 
+  
+---
+
+## Multiple Inheritance
+
+.pull-left[
+Things get more complicated when the class has multiple parents.
+
+
+The basic process remains the same: you start from the actual class supplied to the generic, then follow the arrows until you find a defined method. The wrinkle is that now there are multiple arrows to follow, so you might find multiple methods. If that happens, you pick the method that is closest, i.e. requires travelling the fewest arrows. 
+]
+
+.pull-right[
+&lt;img src="img/multiple.png" width="60%" height="60%" style="display: block; margin: auto;" /&gt;
+]
+
+---
+
+If no method can be found it will be highlighted with a red double outline. What happens if methods are the same distance - an ambiguous method? An __ambiguous__ method will be illustrated with a thick dotted border
+
+&lt;img src="img/multiple-ambig.png" width="30%" height="30%" style="display: block; margin: auto;" /&gt;
+
+---
+
+With multiple inheritances it is hard to simultaneously prevent ambiguity, ensure that every terminal method has an implementation, and minimise the number of defined methods (in order to benefit from OOP). For example, of the six ways to define only two methods for this call, only one is free from problems. 
+
+&lt;img src="img/multiple-all.png" width="50%" height="50%" style="display: block; margin: auto;" /&gt;
+
+---
+
+## Multiple dispatch
+
+
+After multiple inheritance, understanding multiple dispatch is straightforward. You follow multiple arrows in the same way as previously, but now each method is specified by two classes (separated by a comma).
+
+&lt;img src="img/single-single.png" width="30%" height="30%" style="display: block; margin: auto;" /&gt;
+
+---
+
+The main difference between multiple inheritance and multiple dispatch is that there are many more arrows to follow. The following diagram shows four defined methods which produce two ambiguous cases:
+
+&lt;img src="img/single-single-ambig.png" width="30%" height="30%" style="display: block; margin: auto;" /&gt;
+
+Multiple dispatch tends to be less tricky to work with than multiple inheritance because there are usually fewer terminal class combinations. In this example, there's only one. That means, at a minimum, you can define a single method and have default behaviour for all inputs.
+
+---
+
+## S4 Dispatch: KISS Principle
+.pull-left[
+S4 dispatch is complicated because S4 has two important features:
+
+* Multiple inheritance, i.e. a class can have multiple parents, 
+* Multiple dispatch, i.e. a generic can use multiple arguments to pick a method. 
+
+These features make S4 very powerful, but can also make it hard to understand which method will get selected for a given combination of inputs. In practice, keep method dispatch as simple as possible by avoiding multiple inheritance, and reserving multiple dispatch only for where it is absolutely necessary.
+]
+
+.pull-right[
+.center[![Occam's Razor](img/640px-Pluralitas.jpg)]
+
+&lt;br&gt;
+
+&gt; "Pluralitas non est ponenda sine necessitate", i.e., "Plurality is not to be posited without necessity"
+&gt;
+&gt; — William of Ockham
+
+]
+---
+class: inverse center middle
+
+# S4 and S3
+
+---
+
+## Using S3 classes with S4
+
+`slots` and `contains` can be S4 classes, S3 classes, or implicit class of base type. 
+
+Must register S3 classes with `setOldClass()`:
+
+
+```r
+setOldClass("data.frame")
+```
+
+However, better to be specific and provide full S4 definition:
+
+
+```r
+setClass("factor",
+  contains = "integer",
+  slots = c(
+    levels = "character"
+  ),
+  prototype = structure(
+    integer(),
+    levels = character()
+  )
+)
+setOldClass("factor", S4Class = "factor")
+```
+
+
+---
+
+## Using S3 methods with S4
+
+Can create new S4 generics or convert S3 generics to S4:
+
+
+```r
+setGeneric("mean")
+```
+
+The existing function becomes the default (`ANY`) method:
+
+
+```r
+selectMethod("mean", "ANY")
+```
+
+```
+## Method Definition (Class "derivedDefaultMethod"):
+## 
+## function (x, ...) 
+## UseMethod("mean")
+## &lt;bytecode: 0x55fd762382d0&gt;
+## &lt;environment: namespace:base&gt;
+## 
+## Signatures:
+##         x    
+## target  "ANY"
+## defined "ANY"
+```
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"slideNumberFormat": "%current%",
+"highlightStyle": "github",
+"highlightLines": true,
+"ratio": "16:9",
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
