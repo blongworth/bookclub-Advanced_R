@@ -84,7 +84,6 @@ This repo contains 3 main folders:
 
 </details>
 
-
 <hr>
 
 *Cohort 5 [Europe/Africa]: (started 2021-03-16) Tuesdays, 18:30 CET (CEST)*
@@ -93,20 +92,27 @@ This repo contains 3 main folders:
 - 2021-03-30 Chapter 03: Vectors  -  Layla Bouzoubaa
 - 2021-04-06 Chapter 04: Subsetting - kayteeflick
 - 2021-04-13 Chapter 05: Control flow - Jiwan Heo
-- 2021-04-20 Chapter 06: Functions - Brett Longworth 
-- 2021-04-27 Chapter 07: Enviroments - Adrian Fletcher 
-- 2021-05-04 Chapter 08:  Conditions - 
-
-
-<details>
-  <summary> Future Meetings </summary>
-
-- 2021-01-26 Chapter 09: Functionals
-
-</details>
+- 2021-04-20 Chapter 06: Functions - Brett Longworth
+- 2021-04-27 Chapter 07: Enviroments - Adrian Fletcher
+- 2021-05-04 Chapter 08: Conditions -  Mariela
+- 2021-05-18 Chapter 09: Functionals - Shamsuddeen
+- 2021-05-25 Chapter 10: Function Factories - Brett Longworth
+- 2021-06-01 Chapter 11: Function Operators - Jiwan Heo
+- 2021-06-08 Chapter 12-13: Intro to OOP & S3 - Hannes Oberreiter
+- 2021-06-15 Chapter 14: R6 - Hannes Oberreiter
+- 2021-06-22 Chapter 15: S4 - Brett Longworth
+- 2021-06-29 Chapter 16: Trade-offs - Shamsuddeen
+- 2021-07-06 Chapter 17: Big-Picture - Mariela
+- 2021-07-13 Chapter 18: Expressions - Hannes Oberreiter
+- 2021-07-20 Chapter 19: Quasiquotation - Shamsuddeen
+- 2021-07-27 Chapter 20: Evaluation - Jiwan Heo
+- 2021-08-03 Chapter 21: Translating R Code - Layla Bouzoubaa
+- 2021-08-10 Chapter 22: Debugging -
+- 2021-08-17 Chapter 23: Measuring performance - Brett Longworth
+- 2021-08-24 Chapter 24: Improving performance -
+- 2021-08-31 Chapter 25: re-write R code in C++ - Hannes Oberreiter
 
 <hr>
-
 
 ### Presentations & Recordings
 
@@ -194,6 +200,7 @@ Chapter 11 - Function operators
 
 Chapter 12 - OOP base types
 - Cohort 3: [Megan Stodel](https://twitter.com/MeganStodel) ([slides](https://github.com/MeganStodel/bookclub-Advanced_R/tree/cohort-3-base-types/Presentations/Week12/Cohort3)  | [video](https://youtu.be/IL6iJhAsZAY))
+- Cohort 5: [Hannes Oberreiter](https://twitter.com/btree_hannes) ([slides](https://hannesoberreiter.github.io/advr-r-oo-presi/index_basic.html#1) | [video](https://youtu.be/NeHtEGab1Og))
 
 Chapter 12 + 13 - OOP base types + S3
 
@@ -201,6 +208,7 @@ Chapter 12 + 13 - OOP base types + S3
 - Cohort 2: Chris Yarrison (SLIDES | [video](https://youtu.be/9GkgNC15EAw))
 - Cohort 3 (13, part 1): Anne Hoffrichter ([slides](https://r4ds.github.io/bookclub-Advanced_R/Presentations/Week13/Cohort3/part1/13_S3_part1.html) | [video](https://youtu.be/q7lFXSLdC1g))
 - Cohort 3 (13, part 2): [Anna-Leigh Brown](https://twitter.com/annaleighbrown2) (SLIDES | [video](https://youtu.be/2rHS_urTGFg))
+- Cohort 5: [Hannes Oberreiter](https://twitter.com/btree_hannes) ([slides](https://hannesoberreiter.github.io/advr-r-oo-presi/index_s3.html#1) | [video](https://youtu.be/NeHtEGab1Og))
 
 Chapter 14 - R6
 
@@ -208,6 +216,7 @@ Chapter 14 - R6
 - Cohort 2: Ezra Porter ([slides](https://r4ds.github.io/bookclub-Advanced_R/Presentations/Week13/Cohort2/Chapter-14.html#1) | [video](https://youtu.be/LVkDJ28XJUE))
 - Cohort 3: (14, part 1) [Anna-Leigh Brown](https://twitter.com/annaleighbrown2) (SLIDES | [video](https://youtu.be/rCjQTbQ22qc))
 - Cohort 3: (14, part 2) [Megan Stodel](https://twitter.com/MeganStodel) ([slides](Presentations/Week14/Cohort3/R6.pdf))  
+- Cohort 5: [Hannes Oberreiter](https://twitter.com/btree_hannes) ([slides - Cohort 2](https://r4ds.github.io/bookclub-Advanced_R/Presentations/Week13/Cohort2/Chapter-14.html#1) | [video](https://youtu.be/NXmlqK2LxWw))
 
 Chapter 15 - S4
 
@@ -230,6 +239,7 @@ Chapter 18 - Expressions
 - Cohort 1: [Maya Gans](https://maya.rbind.io) ([slides](https://r4ds.github.io/bookclub-Advanced_R/Presentations/Week17/Cohort1/Chapter18.html#1) | [video](https://youtu.be/2NixH3QAerQ) | [app](https://r4dscommunity.shinyapps.io/adv_r-expressions/) | [app code](https://github.com/r4ds/bookclub-Advanced_R/tree/master/Presentations/Week17/Cohort1/expressions))
 - Cohort 2: Jake Riley (SLIDES | [video](https://youtu.be/mYOUgzoRcjI))
 - Cohort 3: [Megan Stodel](https://twitter.com/MeganStodel) ([slides](Presentations/Week14/Cohort3/Expressions.pdf))  
+- Cohort 5: [Hannes Oberreiter](https://twitter.com/btree_hannes) ([slides - Cohort 2](https://r4ds.github.io/bookclub-Advanced_R/Presentations/Week17/Cohort5/index_expression.html) | [video](https://youtu.be/Jc_R4yFsYeE))
 
 Chapter 19 - Quasiquotation
 
