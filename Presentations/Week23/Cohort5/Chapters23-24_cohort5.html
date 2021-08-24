@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Advanced R: Chapters 23 &amp; 24</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Brett Longworth" />
+    <meta name="date" content="2021-08-24" />
+    <script src="libs/header-attrs-2.8/header-attrs.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Advanced R: Chapters 23 &amp; 24
+## Performance metrics and improvement
+### Brett Longworth
+### 2021-08-24
+
+---
+
+
+
+
+
+&lt;style&gt;
+.pull-more-left {
+  float: left;
+  width: 40%;
+}
+.pull-less-right {
+  float: right;
+  width: 56%;
+}
+.pull-less-right ~ * {
+  clear: both;
+}
+.remark-code-line {
+  font-size: 0.7em !important;
+}
+&lt;/style&gt;
+
+
+# Two types of time
+
+- Person time
+- Machine time
+
+Machine time is cheap, person time is priceless!
+
+- Slow and safe &gt; fast and unsafe
+- Slow and readable &gt; fast and indecipherable
+- Slow and fast to write &gt; fast and takes hours
+
+That said: 
+
+- Good coding practices that make code faster usually make it cleaner
+- Time spent waiting for slow code IS person time
+- Slow execution breaks flow, delays iteration and results
+
+---
+# The quote
+
+&gt; We should forget about small efficiencies, say about 97% of the time: premature optimization is the root of all evil. Yet we should not pass up our opportunities in that critical 3%. A good programmer will not be lulled into complacency by such reasoning, he will be wise to look carefully at the critical code; but only after that code has been identified.
+&gt;
+&gt; --- Donald Knuth (actually Sir Tony Hoare)
+
+
+#### Meaning: Don't get caught up in making things faster, but keep efficient coding practices in mind while developing.
+
+.footnote[
+Knuth quotes: https://en.wikiquote.org/wiki/Donald_Knuth
+]
+---
+
+# How to go fast
+
+- Find out what's making it slow (Chapter 23)
+- Experiment with faster alternatives (Chapter 24)
+
+---
+class: inverse center middle
+# Part 1: What's making it slow?
+
+---
+
+# Profiling
+
+
+.pull-more-left[
+
+- Use a profiler: `profvis`
+- A sampling/statistical profiler
+- Periodically stops execution and looks at the call stack
+
+
+```r
+#class: hide-logo
+f &lt;- function() {
+  pause(0.1)
+  g()
+  h()
+}
+
+g &lt;- function() {
+  pause(0.1)
+  h()
+}
+
+h &lt;- function() {
+  pause(0.1)
+}
+```
+
+
+```r
+profvis::profvis(f())
+```
+]
+
+
+.pull-less-right[
+![profile](www/flamegraph.png)
+]
+
+---
+# Memory profiling
+.pull-more-left[
+
+```r
+x &lt;- integer()
+
+for(i in 1:1e4) {
+  x &lt;- c(x, i)
+}
+```
+
+Hmm... looks like `&lt;GC&gt;` is taking much of our time. This shows that large amounts of memory are being allocated (bar on the right) and freed-up (bar on the left)
+
+Some premature optimization would be good here!
+]
+
+.pull-less-right[
+![memory](www/memory.png)
+]
+
+---
+# Limitations
+- Profiling does not extend to C code.
+- Using anonymous functions can make profiling difficult. Give them names.
+- Lazy evaluation can make things complicated:
+
+.pull-left[
+
+```r
+i &lt;- function() {
+  pause(0.1)
+  10
+}
+j &lt;- function(x) {
+  x + 10
+}
+j(i())
+```
+]
+
+.pull-right[
+&gt;"...profiling would make it seem like `i()` was called by `j()` because the argument isn't evaluated until it's needed by `j()`."
+]
+![lazy-eval](www/lazy-eval.png)
+
+---
+# Microbenchmarking
+- For very small bits of code
+- **Beware of generalising to real code:** higher-order effects may mask the small bits of code
+&gt; "a deep understanding of subatomic physics is not very helpful when baking"
+
+`Bench` package
+
+- Uses highest precision timing API's (often ns)
+- Checks for output equivalence of expressions
+- Can map over a grid of iterations and inputs
+- Nice plotting
+
+---
+
+.pull-more-left[
+
+```r
+x &lt;- runif(100)
+(lb &lt;- bench::mark(
+  sqrt(x),
+  x ^ 0.5
+))
+```
+
+```
+## # A tibble: 2 x 6
+##   expression      min   median `itr/sec` mem_alloc `gc/sec`
+##   &lt;bch:expr&gt; &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt; &lt;bch:byt&gt;    &lt;dbl&gt;
+## 1 sqrt(x)    276.95ns 308.97ns  2423621.      848B     242.
+## 2 x^0.5        1.93µs   1.98µs   439640.      848B       0
+```
+
+]
+
+
+---
+.pull-left[
+
+```r
+plot(lb)
+```
+
+![](Chapters23-24_cohort5_files/figure-html/unnamed-chunk-6-1.png)&lt;!-- --&gt;
+]
+
+.pull-right[
+Median is usually the best metric due to long tails.
+]
+
+---
+class: inverse center middle
+# Part 2: Making it go fast!
+
+---
+
+
+"Four" techniques:
+1. Organise your code
+1. Look for existing solutions
+1. The importance of being lazy
+1. Vectorise
+1. Avoid the perils of copying data
+
+
+---
+## 1. Organise your code
+Write a function for each approach:
+
+
+```r
+mean1 &lt;- function(x) mean(x)
+mean2 &lt;- function(x) sum(x)/length(x)
+```
+
+Generate representative test cases:
+
+
+```r
+x &lt;- runif(1e5)
+```
+
+Precisely compare the variants (and include unit tests (not included))
+
+
+```r
+bench::mark(
+  mean1(x),
+  mean2(x)
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+```
+## # A tibble: 2 x 4
+##   expression      min   median `itr/sec`
+##   &lt;bch:expr&gt; &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
+## 1 mean1(x)    153.2µs  157.3µs     6296.
+## 2 mean2(x)     76.2µs   76.4µs    12626.
+```
+
+---
+## 2. Check for existing solutions
+- CRAN task views (http://cran.rstudio.com/web/views/)
+- Reverse dependencies of Rcpp (https://cran.r-project.org/web/packages/Rcpp/)
+- Go out and talk to people:
+  - rseek on Google (http://www.rseek.org/)
+  - Stackoverflow with the R tag, `[R]`
+  - https://community.rstudio.com/
+  - R4DS learning community!!!
+
+---
+## 3. Do as little as possible
+- Use a function tailored to a more specific type of input or to a more specific problem:
+  - `rowSums()`, `colSums()`, `rowMeans()`, and `colMeans()` are faster than equivalent invocations that use `apply()` because they are vectorised 
+  - `vapply()` is faster than `sapply()` because it pre-specifies the output type
+  - `any(x == 10)` is much faster than `10 %in% x` because testing equality is simpler than testing set inclusion.
+- Avoid situations where input data has to be coerced into a different type.
+  - Example: giving a data frame to a function that requires a matrix, like `apply()`
+- Some other tips:
+  - `read.csv()`: specify known column types or use `readr::read_csv()` or `data.table::fread()`
+  - `factor()`: specify known levels
+  - `cut()`: use `labels = FALSE` or `findInterval()`
+  - `unlist(x, use.names = FALSE)` is faster than `unlist(x)`
+  - `interaction()`: use `drop = TRUE` if you can
+
+
+---
+### Example: avoiding method dispatch
+
+```r
+*x &lt;- runif(1e2)
+bench::mark(
+  mean(x),
+  mean.default(x),
+  .Internal(mean(x))
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+```
+## # A tibble: 3 x 4
+##   expression              min   median `itr/sec`
+##   &lt;bch:expr&gt;         &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
+## 1 mean(x)               1.9µs   2.02µs   436026.
+## 2 mean.default(x)         1µs   1.07µs   805532.
+## 3 .Internal(mean(x))  236.1ns 242.14ns  3807655.
+```
+
+OMG, dispatch is so slow!
+
+
+```r
+*x &lt;- runif(1e4)
+bench::mark(
+  mean(x),
+  mean.default(x),
+  .Internal(mean(x))
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+```
+## # A tibble: 3 x 4
+##   expression              min   median `itr/sec`
+##   &lt;bch:expr&gt;         &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
+## 1 mean(x)              17.2µs   17.5µs    55745.
+## 2 mean.default(x)        16µs   16.3µs    60094.
+## 3 .Internal(mean(x))   15.1µs   15.2µs    64436.
+```
+
+But only when x is small, and *safety* of proper dispatch is worth it!
+---
+### But beware!
+
+&lt;img src="www/Internal-warning.png" width="1840" /&gt;
+
+---
+### Example 2: avoiding input coercion
+`as.data.frame()` is slow because it coerces each element into a data frame.  
+
+You could, instead, store you data in a named list of equal-length vectors:
+
+```r
+quickdf &lt;- function(l) {
+  class(l) &lt;- "data.frame"
+  attr(l, "row.names") &lt;- .set_row_names(length(l[[1]]))
+  l
+}
+
+l &lt;- lapply(1:26, function(i) runif(1e3))
+names(l) &lt;- letters
+
+dplyr::glimpse(l[1:6])
+```
+
+```
+## List of 6
+##  $ a: num [1:1000] 0.3188 0.7503 0.0648 0.5318 0.9994 ...
+##  $ b: num [1:1000] 0.7934 0.3644 0.7927 0.3371 0.0351 ...
+##  $ c: num [1:1000] 0.1531 0.5794 0.6497 0.8195 0.0981 ...
+##  $ d: num [1:1000] 0.5084 0.0129 0.2255 0.4833 0.4914 ...
+##  $ e: num [1:1000] 0.767 0.348 0.355 0.817 0.344 ...
+##  $ f: num [1:1000] 0.751 0.153 0.927 0.806 0.955 ...
+```
+
+
+---
+
+```r
+bench::mark(
+  as.data.frame = as.data.frame(l),
+  quick_df = quickdf(l)
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+```
+## # A tibble: 2 x 4
+##   expression         min   median `itr/sec`
+##   &lt;bch:expr&gt;    &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
+## 1 as.data.frame  837.4µs 890.25µs     1112.
+## 2 quick_df        5.91µs   6.52µs   144046.
+```
+
+&lt;hr&gt;
+
+### Caveat:
+This approach requires carefully reading through source code!
+
+
+```r
+quickdf(list(x = 1, y = 1:2))
+```
+
+```
+## Warning in format.data.frame(if (omit) x[seq_len(n0), , drop = FALSE] else x, :
+## corrupt data frame: columns will be truncated or padded with NAs
+```
+
+```
+##   x y
+## 1 1 1
+```
+
+
+---
+## 4. Vectorise
+- Finding the existing R function that is implemented in C and most closely applies to your problem
+- Some commonly used functions:
+  - `rowSums()`, `colSums()`, `rowMeans()`, and `colMeans()` 
+  - Vectorised subsetting (Chapter 4)
+  - Use `cut()` and `findInterval()` for converting continuous variables to categorical
+  - Be aware of vectorised functions like `cumsum()` and `diff()`
+  - Use matrix algebra
+- https://www.noamross.net/archives/2014-04-16-vectorization-in-r-why/
+
+---
+## 5. Avoid copying
+- Often shows up if using `c()`, `append()`, `cbind()`, `rbind()`, `paste()`
+
+
+```r
+random_string &lt;- function() {
+  paste(sample(letters, 50, replace = TRUE), collapse = "")
+}
+strings10 &lt;- replicate(10, random_string())
+strings100 &lt;- replicate(100, random_string())
+
+collapse &lt;- function(xs) {
+  out &lt;- ""
+  for (x in xs) {
+    out &lt;- paste0(out, x)
+  }
+  out
+}
+
+bench::mark(
+  loop10  = collapse(strings10),
+  loop100 = collapse(strings100),
+  vec10   = paste(strings10, collapse = ""),
+  vec100  = paste(strings100, collapse = ""),
+  check = FALSE
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+
+---
+
+
+
+```r
+bench::mark(
+  loop10  = collapse(strings10),
+  loop100 = collapse(strings100),
+  vec10   = paste(strings10, collapse = ""),
+  vec100  = paste(strings100, collapse = ""),
+  check = FALSE
+)[c("expression", "min", "median", "itr/sec", "n_gc")]
+```
+
+```
+## # A tibble: 4 x 4
+##   expression      min   median `itr/sec`
+##   &lt;bch:expr&gt; &lt;bch:tm&gt; &lt;bch:tm&gt;     &lt;dbl&gt;
+## 1 loop10      17.27µs  18.55µs    52314.
+## 2 loop100    502.46µs 511.11µs     1922.
+## 3 vec10        3.83µs   3.97µs   243745.
+## 4 vec100      26.78µs  27.49µs    35426.
+```
+
+---
+# Case study: t-test
+
+
+```r
+m &lt;- 1000
+n &lt;- 50
+X &lt;- matrix(rnorm(m * n, mean = 10, sd = 3), nrow = m)
+grp &lt;- rep(1:2, each = n/2)
+```
+---
+# Case study: t-test (cont'd)
+Formula interface:
+
+```r
+system.time(
+  for(i in 1:m) {
+    t.test(X[i, ] ~ grp)$statistic
+  }
+)
+```
+
+```
+##    user  system elapsed 
+##   0.514   0.000   0.517
+```
+Provide two vectors
+
+```r
+system.time(
+  for(i in 1:m) {
+    t.test(X[i, grp == 1], X[i, grp == 2])$statistic
+  }
+)
+```
+
+```
+##    user  system elapsed 
+##   0.106   0.001   0.107
+```
+
+---
+# Case study: t-test (cont'd)
+### Add functionality to save the values:
+
+```r
+compT &lt;- function(i) {
+  t.test(X[i, grp == 1], X[i, grp == 2])$statistic
+}
+system.time(t1 &lt;- purrr::map_dbl(1:m, compT))
+```
+
+```
+##    user  system elapsed 
+##   0.116   0.000   0.116
+```
+
+---
+# Case study: t-test (cont'd)
+### Do less work:
+
+```r
+my_t &lt;- function(x, grp) {
+  t_stat &lt;- function(x) {
+    m &lt;- mean(x)
+    n &lt;- length(x)
+    var &lt;- sum((x - m) ^ 2)/(n-1)
+    
+    list(m = m, n = n, var = var)
+  }
+  
+  g1 &lt;- t_stat(x[grp == 1])
+  g2 &lt;- t_stat(x[grp == 2])
+  
+  se_total &lt;- sqrt(g1$var / g1$n + g2$var / g2$n)
+  (g1$m - g2$m) / se_total
+}
+
+system.time(t2 &lt;- purrr::map_dbl(1:m, ~ my_t(X[.,], grp)))
+```
+
+```
+##    user  system elapsed 
+##    0.02    0.00    0.02
+```
+
+```r
+stopifnot(all.equal(t1, t2))
+```
+
+---
+# Case study: t-test (cont'd)
+### Vectorise it:
+
+```r
+rowtstat &lt;- function(X, grp) {
+  t_stat &lt;- function(X) {
+    m &lt;- rowMeans(X)
+    n &lt;- ncol(X)
+    var &lt;- rowSums((X - m) ^ 2)/(n - 1)
+    
+    list(m = m, n = n, var = var)
+  }
+  
+  g1 &lt;- t_stat(X[, grp == 1])
+  g2 &lt;- t_stat(X[, grp == 2])
+  
+  se_total &lt;- sqrt(g1$var/g1$n + g2$var/g2$n)
+  (g1$m - g2$m) / se_total
+}
+system.time(t3 &lt;- rowtstat(X, grp))
+```
+
+```
+##    user  system elapsed 
+##   0.009   0.000   0.009
+```
+
+```r
+stopifnot(all.equal(t1, t3))
+```
+
+---
+
+# Resources
+- [https://github.com/r-prof/jointprof](https://github.com/r-prof/jointprof) (for profiling C code)
+- *Evaluating the Design of the R Language* - Morandat et al., 2012
+- The R Inferno (http://www.burns-stat.com/pages/Tutor/R_inferno.pdf) - Patrick Burns
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:9",
+"highlightLines": true
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+<style>
+.logo {
+  background-image: url(r4ds.png);
+  background-size: contain;
+  background-repeat: no-repeat;
+  position: absolute;
+  top: 1em;
+  right: 1em;
+  width: 110px;
+  height: 128px;
+  z-index: 0;
+}
+</style>
+
+<script>
+document
+  .querySelectorAll(
+    '.remark-slide-content' +
+    ':not(.title-slide)' +
+    // add additional classes to exclude here, e.g.
+    // ':not(.inverse)' +
+    ':not(.hide-logo)'
+  )
+  .forEach(el => {
+    el.innerHTML += '<div class="logo"></div>';
+  });
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
